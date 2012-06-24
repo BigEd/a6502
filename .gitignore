@@ -2,6 +2,8 @@
 *.slo
 *.lo
 *.o
+*.bin
+*.elf
 
 # Compiled Dynamic libraries
 *.so
@@ -10,3 +12,9 @@
 *.lai
 *.la
 *.a
+
+# editor backup
+*~
+
+# make dependencies
+*.d
