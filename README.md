@@ -22,15 +22,21 @@ binary distribution is accompanied by source.
 
 Refer to the stm6502 project for details about tools and downloading
 built firmware.  The Makefile here will build a *.bin which includes
-a memory image populated with 6502 software from that project:
+an initial memory image for the 6502 - usually that would include a
+bootstrap ROM, monitor or application. 
+
+For convenience, there's a built a6502.bin file included in a
+subdirectory.  (This file is derived in part from other open source
+projects and does not form part of the source of this project.)
+
+An example memory image called
+  - basfigmon.img
+is provided for convenience only, and does not form part of the source
+of this project. It was built with 'dd' commands from binaries found
+in stm6502 - sources are found in that project. It contains:
   - supermon64 at F800, entered at reset
   - figforth at 0200 (g 0200)
   - EhBASIC at c800 (g c800)
-
-The memory image is called
-  - basfigmon.img
-and was built with 'dd' commands from binaries found in stm6502 -
-sources are found in that project. 
 
 A microUSB cable connected to the south edge of the dev board offers
 a serial connection to the emulated CPU, which communicates using
