@@ -29,9 +29,8 @@ For convenience, there's a built a6502.bin file included in a
 subdirectory.  (This file is derived in part from other open source
 projects and does not form part of the source of this project.)
 
-An example memory image called
-  - basfigmon.img
-is provided for convenience only, and does not form part of the source
+An example memory image called `basfigmon.img` is provided for
+convenience only, and does not form part of the source
 of this project. It was built with 'dd' commands from binaries found
 in stm6502 - sources are found in that project. It contains:
   - supermon64 at F800, entered at reset
@@ -47,15 +46,15 @@ It's not possible for the 6502 to read a null byte, as zero is used as
 a sentinel value.  The provided C routine which handles opcode 42
 (WDM) also translates between \n and \r characters. 
 
+The three ROMs mentioned above seem to work correctly, as do some
+trivial test sequences found in top.c - bug reports are welcome.
+
 At present the emulator does not emulate decimal mode, or model the
 four non-essential bits of the status register. Only NVZC are
 modelled. It's not too hard to fix both of these.
 
-The three ROMs mentioned above seem to work correctly, as do some
-trivial test sequences found in top.c - bug reports are welcome.
-
-(EhBASIC needs decimal mode only for HEX$() which is therefore
-presently misbehaving.)
+EhBASIC needs decimal mode only for HEX$() which is therefore
+presently misbehaving.
 
 Remodelling the emulator in Thumb or ARM assembly might be interesting
-- ARM would be easier.
+(ARM would be the easier case.)
