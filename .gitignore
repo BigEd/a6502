@@ -1,17 +1,10 @@
-# Compiled Object files
+# Derived files
 *.slo
 *.lo
 *.o
 *.bin
 *.elf
-
-# Compiled Dynamic libraries
-*.so
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
+*.lst
 
 # editor backup
 *~
