@@ -23,6 +23,8 @@
 #include <libopencm3/usb/cdc.h>
 
 extern char MEMIMAGE[];
+extern char MEMIMAGE_END[]; /* not an array but the end label to calculate length */
+
 extern int emulator(int v, char *mem);
 extern char usb_rx_buf[]; 
 char usb_tx_buf[200];
@@ -62,7 +64,9 @@ void printbadinstruction(int d, int a){
 
 void patchinput(char *mem, int a){
 	if (mem[a]==0xad && mem[a+1]==0xf0 && mem[a+2]==0xff ) {
+#ifdef DEBUG
 		writechar('P');
+#endif
 		mem[a]=0x42;
 		mem[a+1]=0x1;
 		mem[a+2]=0xea;
@@ -368,13 +372,16 @@ void top(){
 	mem[0xfffd]=0x02;
 #else
 
-	/* copy a whole-memory image to the 6502 memory space */
+	/* copy a (whole or partial) memory image to the 6502 memory space */
+
+	/* set a default reset vector for images which lack one */
 	mem[0xfffc]=0x00;
-	mem[0xfffd]=0xf8;  /* default reset vector for the case of a rom-only or partial copy */
+	mem[0xfffd]=0xf8;
 
 	char *p = MEMIMAGE;
-	for(int i=0;i<0x10000;i++){
-		mem[i]=*p++;
+	int len=MEMIMAGE_END-MEMIMAGE;
+	for(int i=0x10000-len; i<0x10000; i++){
+		mem[i] = *p++;
 	}
 
 	/* patch memory-mapped i/o to use WDM opcode */
@@ -384,11 +391,19 @@ void top(){
 	patchoutput(&mem[0], 0xC82F);
 	patchinput(&mem[0], 0x1BBB);   /* figforth */
 	patchoutput(&mem[0], 0x1BC1);
+	patchinput(&mem[0], 0xffd4);   /* tube-like OS for HiBASIC */
+	patchoutput(&mem[0], 0xff29);
 
+#ifdef DEBUG
         printhex8(mem[0xf800]); /* just for confidence */
         printhex8(mem[0xf801]);
         printhex8(mem[0xf802]);
         printhex8(mem[0xf803]);
+        printhex8(mem[0xb800]); /* just for confidence */
+        printhex8(mem[0xb801]);
+        printhex8(mem[0xb802]);
+        printhex8(mem[0xb803]);
+#endif
 #endif
 
 	int resetv = mem[0xfffc] + 256*mem[0xfffd];
