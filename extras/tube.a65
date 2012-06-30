@@ -1,0 +1,250 @@
+; 
+;  This file is part of the a6502 project.
+; 
+;  Copyright (C) 2012 Ed Spittles <ed.spittles@gmail.com>
+; 
+;  This library is free software: you can redistribute it and/or modify
+;  it under the terms of the GNU Lesser General Public License as published by
+;  the Free Software Foundation, either version 3 of the License, or
+;  (at your option) any later version.
+; 
+;  This library is distributed in the hope that it will be useful,
+;  but WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;  GNU Lesser General Public License for more details.
+; 
+;  You should have received a copy of the GNU Lesser General Public License
+;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
+; 
+
+; a set of stubs to fit in the top 2k of memory to fake a TUBE environment
+;   (that is, a 6502 BBC second processor)
+;
+; sufficient at least to run HiBASIC (1983 version)
+; presently good enough for interactive i/o but no other OS calls
+;
+; /opt/cc65/bin/ca65 tube.a65 
+; /opt/cc65/bin/ld65 -t none -o tube.bin tube.o
+;
+
+.org $ff10	; adjusted to place the reset and brk vectors correctly
+
+;; we think the tube os uses zero page addresses EE upwards
+tmpptr = $ee	; points to oscli parameter block
+tmplen = $f0	; max line length
+tmpmin = $f1	; min acceptable char value
+tmpmax = $f2	; max acceptable char value
+
+init:
+	lda #<nvwrch
+	sta $020e
+	lda #>nvwrch
+	sta $020e+1
+	lda #<Lfff4
+	sta $020a
+	lda #>Lfff4
+	sta $020a+1
+
+	lda #1
+	jmp $b800	; appropriate for HiBASIC
+
+nvwrch:
+	sta $fff0
+	rts
+
+osbyte:
+	cmp #$7e	; acknowledge escape
+	bne n1
+	ldx #$ff	; the least we can do
+	rts
+
+n1:	cmp #$82	; read machine high order address
+	bne n2
+	ldy #0
+	ldx #0
+	rts
+
+n2:	cmp #$83	; read OSHWM
+	bne n3
+	ldx #0
+	ldy #$08	; 08 for second processor, 0e for beeb
+	rts
+
+n3:	cmp #$84	; read HIMEM
+	bne n4
+	ldx #0
+	ldy #$b8	; f8 for empty second processor, b8 for hibasic, 80 for beeb
+	rts
+
+n4:	cmp #$da	; Read/Write VDU Queue length (HiBASIC uses only to clear)
+	bne n5
+	rts
+
+n5:	.byte $02	; illegal
+
+; code by JGH retrieved from http://mdfs.net/Software/Tube/Serial/6502.src
+
+; REM J.G.Harston, 16-Nov-2010
+; REM This code may be freely reused, with acknowledgements
+
+IRQA  = $fc
+FAULT = $fd
+BRKV  = $202
+IRQ1V = $204
+IRQ2V = $206
+
+;\ Interrupt handlers
+;\ ==================
+InterruptHandler:
+	STA IRQA
+	PLA
+	PHA              ; :\ Save A, get flags from stack
+	AND #$10
+	BNE BRKHandler   ; :\ If BRK, jump to BRK handler
+
+	beq BRKHandler	; special case for a6502 - ignore the B bit
+
+	JMP (IRQ1V)      ; :\ Continue via IRQ1V handler
+
+IRQ1Handler:
+	JMP (IRQ2V)      ; :\ Pass on to IRQ2V
+
+BRKHandler:
+	TXA
+	PHA              ; :\ Save X
+	TSX
+	LDA $0103,X      ; :\ Get address from stack
+	CLD
+	SEC
+	SBC #$01
+	STA FAULT
+	LDA $0104,X
+	SBC #$00
+	STA FAULT+1      ; :\ $FD/E=>after BRK opcode
+	PLA
+	TAX
+	LDA IRQA         ; :\ Restore X, get saved A
+	CLI
+	JMP (BRKV)       ; :\ Restore IRQs, jump to Error Handler
+
+; end of JGH code
+
+osword:
+	cmp #$00	; read line of input
+	bne osw1
+
+	stx tmpptr	; tmpptr points to the parameter block at $0037
+	sty tmpptr+1
+
+	ldy #0
+	lda (tmpptr),y	; capture the buffer pointer
+	pha
+	iny
+	lda (tmpptr),y	; and the high byte
+	pha
+	iny
+	lda (tmpptr),y	; max line length
+	sta tmplen
+	iny
+	lda (tmpptr),y	; min acceptable char value
+	sta tmpmin
+	iny
+	lda (tmpptr),y	; max acceptable char value
+	sta tmpmax
+	pla
+	sta tmpptr+1	; reuse tmpptr to point to the buffer
+	pla
+	sta tmpptr
+
+	ldy #1		; neater to have counted down and used X instead of the stack
+
+osw00del:
+	dey
+
+osw00more:
+	jsr osrdch
+	bcs osw00esc	; escape
+
+.ifdef NLTOCR
+	cmp #$0a	; linux line end
+	bne os00skip
+	lda #$0d	; substitute beeb line end
+os00skip:
+	cmp #$0d	; beeb's native line end
+	beq osw00ok	; line ends bypass the valid characters test(?)
+.endif
+
+	cmp #$15	; line erase
+	bne osnotctrlu
+	ldy #0		; the least we can do!
+	beq osw00more
+
+osnotctrlu:
+	sta (tmpptr),y	; accept the character, for now
+	iny
+	cmp #$0d	; beeb's native line end
+	beq osw00done
+
+	cmp tmpmin	; check against valid range
+	bcc osw00del	; reject - should write a backspace char really
+	cmp tmpmax
+	beq osw00ok
+	bcs osw00del
+
+osw00ok:
+	jsr nvwrch	; echo
+	cpy tmplen
+	bne osw00more
+			; we overran - should beep
+
+osw00done:
+	jsr osnewl
+	clc
+osw00esc:
+	rts
+
+osw1:
+	.byte $02	; illegal
+
+osrdch:
+	lda $fff0	; blocking read
+	cmp #$1b	; detect escape
+	beq osrdesc
+	clc		; always successful
+	rts
+osrdesc:
+	sec
+	rts
+
+oscli:
+	.byte $02	; illegal
+
+Lffe0:			; OSRDCH not used directly by HiBASIC
+	jmp osrdch
+
+Lffe3:              ; OSASCI
+	cmp #$0D
+	bne Lffee
+Lffe7:              ; OSNEWL
+osnewl:
+	lda #$0A
+	jsr Lffee
+Lffec:              ; OSWRCR
+	lda #$0D
+Lffee:              ; OSWRCH
+	jmp nvwrch
+Lfff1:
+	jmp osword
+Lfff4:
+	jmp osbyte
+Lfff7:
+	jmp oscli
+
+Lnmi:
+	.byte 7,8
+
+Lreset:
+	.word init
+Lirqbrk:
+	.word InterruptHandler
+Lend:
