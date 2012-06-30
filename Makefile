@@ -44,7 +44,7 @@ a6502.o : a6502.c
 emulator.o : emulator.S
 	$(CC) $(CCOPTS) -c $<
 
-memimage.o : memimage.S basfigmon.img
+memimage.o : memimage.S $(IMAGEFILE)
 	$(CC) $(CCOPTS) -c $<
 
 top.o : top.c
