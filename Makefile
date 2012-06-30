@@ -17,9 +17,14 @@
 ## along with this library.  If not, see <http://www.gnu.org/licenses/>.
 ##
 
+IMAGEFILE?=extras/cmon.bin
+CCEXTRA=-DIMAGEFILE=$(IMAGEFILE)
+CCEXTRA=-DIMAGEFILE=$(IMAGEFILE) -DDEBUG
+
 CC=arm-none-eabi-gcc
 CCOPTS=-mcpu=cortex-m4 -std=c99 -Os -g -Wall -Wextra \
-       -fno-common -mcpu=cortex-m4 -mthumb -msoft-float -MD -DSTM32F4
+       -fno-common -mcpu=cortex-m4 -mthumb -msoft-float -MD -DSTM32F4 \
+       $(CCEXTRA)
 
 LD=arm-none-eabi-gcc
 LDOPTS=-lopencm3_stm32f4 -lc -lnosys \
@@ -39,7 +44,7 @@ a6502.o : a6502.c
 emulator.o : emulator.S
 	$(CC) $(CCOPTS) -c $<
 
-memimage.o : memimage.s basfigmon.img
+memimage.o : memimage.S basfigmon.img
 	$(CC) $(CCOPTS) -c $<
 
 top.o : top.c
