@@ -9,7 +9,7 @@
 ; retrieved from http://www.lowkey.comuf.com/cmon.htm
 ;
 ; ported to ca65 from dev65 assembler
-; /opt/cc65/bin/ca65 --listing --feature labels_without_colons cmon.a65 
+; /opt/cc65/bin/ca65 --listing -DSINGLESTEP cmon.a65 
 ; /opt/cc65/bin/ld65 -t none -o cmon.bin cmon.o
 ;
 ; define SINGLESTEP to include the single-stepping plugin
@@ -17,6 +17,8 @@
 ;
 ; ported to 6502 from 65Org16
 ; ported to a6502 emulator
+
+.feature labels_without_colons
 
 .ifdef SINGLESTEP
        .org $fdd3 ; adjusted to place reset vector correctly
@@ -173,7 +175,7 @@ AT     LDA NUMBER
        STA ADRESS+1
        BCS M2J
 GO     JSR G1
-       JMP MON		; returning after a 'go'
+       JMP M2		; returning after a 'go'
 G1     JMP (NUMBER)
 OUTHEX ;JSR OH1		; for 16-bit bytes
 OH1    JSR OH2
