@@ -12,10 +12,17 @@
 ; /opt/cc65/bin/ca65 --listing --feature labels_without_colons cmon.a65 
 ; /opt/cc65/bin/ld65 -t none -o cmon.bin cmon.o
 ;
+; define SINGLESTEP to include the single-stepping plugin
+;     (modified to display registers in AXYS order)
+;
 ; ported to 6502 from 65Org16
 ; ported to a6502 emulator
 
+.ifdef SINGLESTEP
        .org $fdd3 ; adjusted to place reset vector correctly
+.else
+       .org $ff26
+.endif
 
 WIDTH  = 8         ;must be a power of 2
 HEIGHT = 16
@@ -36,19 +43,24 @@ HEIGHT = 16
 ; cmon zero page usage
 ADRESS = 0
 NUMBER = 2
+
+.ifdef SINGLESTEP
 AREG   = 4
 PREG   = 5
 SREG   = 6
 XREG   = 7
 YREG   = 8
 STBUF  = 9 ;uses 9 bytes
+.endif
 
 init:
+.ifdef SINGLESTEP
        TSX
        STX SREG
        PHP
        PLA
        STA PREG
+.endif
 
 MON    CLD
 M1     JSR OUTCR
@@ -86,10 +98,12 @@ M6     getc
 ; Insert additional commands for non-letter characters (or case-sensitive
 ; letters) here
 ;
+.ifdef SINGLESTEP
        CMP #$24		; $ is single step
        BNE NSSTEP
        JMP SSTEP
 NSSTEP
+.endif
 
 ; now dealing with letters
        EOR #$30
@@ -189,6 +203,7 @@ OUTCR  LDA #$0D
        LDA #$0A
        BNE OA1        ;always
 
+.ifdef SINGLESTEP
 SSTEP  LDX #7
 STEP1  LDA STEP4,X
        STA STBUF+1,X
@@ -308,11 +323,11 @@ STOUT  JSR OUTCR
        JSR OUTPC ; fall thru
 OUTREG LDA AREG
        JSR OUTHSP
-       LDA SREG
-       JSR OUTHSP
        LDA XREG
        JSR OUTHSP
        LDA YREG
+       JSR OUTHSP
+       LDA SREG
        JSR OUTHSP
        LDA PREG
        JSR OUTHSP
@@ -382,12 +397,19 @@ BREAK  STA AREG
        CLD
        JSR STOUT
        JMP M1
+.endif
 
 Lnmi:
         .byte 1,2
  
 Lreset:
         .word init
+
 Lirqbrk:
+.ifdef SINGLESTEP
         .word BREAK
+.else
+        .byte 5,6
+.endif
+
 Lend:
