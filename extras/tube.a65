@@ -27,7 +27,7 @@
 ; /opt/cc65/bin/ld65 -t none -o tube.bin tube.o
 ;
 
-.org $ff10	; adjusted to place the reset and brk vectors correctly
+.org $ff09	; adjusted to place the reset and brk vectors correctly
 
 ;; we think the tube os uses zero page addresses EE upwards
 tmpptr = $ee	; points to oscli parameter block
@@ -162,7 +162,7 @@ osw00del:
 	dey
 
 osw00more:
-	jsr osrdch
+	jsr osrdch	; costs a few cycles but easier to intercept
 	bcs osw00esc	; escape
 
 .ifdef NLTOCR
@@ -204,9 +204,15 @@ osw00esc:
 	rts
 
 osw1:
+	cmp #$05	; read i/o processor memory (host processor)
+	bne osw2
+	lda #$0d	; bbc line end - the least we can do!
+	rts
+
+osw2:
 	.byte $02	; illegal
 
-osrdch:
+nvrdch:
 	lda $fff0	; blocking read
 	cmp #$1b	; detect escape
 	beq osrdesc
@@ -220,7 +226,8 @@ oscli:
 	.byte $02	; illegal
 
 Lffe0:			; OSRDCH not used directly by HiBASIC
-	jmp osrdch
+osrdch:
+	jmp nvrdch
 
 Lffe3:              ; OSASCI
 	cmp #$0D
