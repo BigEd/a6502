@@ -49,9 +49,8 @@ a sentinel value.  The provided C routine which handles opcode 42
 The three ROMs mentioned above seem to work correctly, as do some
 trivial test sequences found in top.c - bug reports are welcome.
 
-At present the emulator does not emulate decimal mode, or model the
-four non-essential bits of the status register. Only NVZC are
-modelled. It's not too hard to fix both of these.
+At present the emulator does not emulate decimal mode, but otherwise
+it passes [Klaus Dormann's test suite](http://forum.6502.org/viewtopic.php?f=2&t=2241).
 
 EhBASIC needs decimal mode only for HEX$() which is therefore
 presently misbehaving.
