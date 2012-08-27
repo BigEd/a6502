@@ -47,17 +47,20 @@ r1  effective address
 #define rAcc    r4  /* a (accumulator)       */
 #define rXreg   r5  /* x index register      */
 #define rYreg   r6  /* y index register      */
+#define rTrace  r7  /* trace control - could consolidate into rPbyteLo */
 
-#define rSP     r8  /* sp stack pointer      */
-#define rPbyte  r9  /* Process status byte   */ /* bit 31 down is NZCV */
-
-#define rMask24 r10 /* mask for arithmetic fixup */
+#define rSP       r8  /* sp stack pointer      */
+#define rPbyteHi  r9  /* Process status byte Hi */ /* bit 31 down is in ARM order: NZCV */
+#define rPbyteLo  r10 /* Process status byte Lo */ /* D and I, two stuck bits, in 6502 order: nv-bdizc */
+#define rMask24   r11 /* mask for arithmetic fixup */
 
 #define armNflag (0x80<<24)	/* negative NZCV---- */
 #define armZflag (0x40<<24)	/* zero     NZCV---- */
 #define armCflag (0x20<<24)	/* carry    NZCV---- */
 #define armVflag (0x10<<24)	/* overflow NZCV---- */
 
+#define pByteXflag 0x20		/* stuck      nv-bdizc */
+#define pByteBflag 0x10		/* break      nv-bdizc */
 #define pByteDflag 0x08		/* decimal    nv-bdizc */
 #define pByteIflag 0x04		/* interrupt  nv-bdizc */
 
@@ -69,9 +72,9 @@ r1  effective address
 
 @ convert ARMs Pbyte (NZCV) to 6502 status byte (nv-bdizc) in r0
 .macro pByteToR0
-	mov     r0, rPbyte	@ let's assume D and I are already in place somehow, also bits 4 and 5 set
-	MSR	APSR, rPbyte
-	and	r0, #0x0c	@ leave only D and I
+	mov     r0, rPbyteLo
+	MSR	APSR, rPbyteHi
+@	and	r0, #0x3c	@ leave only X, B, D and I - may be redundant
 	it mi
 	orrmi	r0, #0x80
 	it vs
@@ -84,6 +87,8 @@ r1  effective address
 
 @ convert from 6502 status byte (nv-bdizc) in r0 to ARMs Pbyte (NZCV)
 .macro r0toPByte
+	orr	r0, r0, #(pByteXflag|pByteBflag) @ take care of the stuck bits
+
 	tst	r0, #0x80
 	it ne
 	orrne	r0, #armNflag
@@ -100,9 +105,8 @@ r1  effective address
 	it ne
 	orrne	r0, #armVflag
 
-	orr	r0, #0x30	@ set fixed bits 4 and 5 of 6502 status reg
-
-	mov	rPbyte, r0	@ place D and I in their natural location
+	and	rPbyteHi, r0, #0xf0000000
+	and	rPbyteLo, r0, #0x0000003c
 .endm
 
 @ print cpu state
@@ -163,13 +167,12 @@ r1  effective address
 .endm
 
 .macro setflags_pre
-	@ MSR APSR_nzcvq, rPbyte
-	MSR APSR, rPbyte
+	MSR APSR, rPbyteHi
 .endm
 
 .macro setflags_post
-	@ MRS rPbyte, APSR_nzcvq
-	MRS rPbyte, APSR  @ this is a deprecated form, but all that gas accepts
+	@ this action zeros the three lower bytes, which is why a single rPbyte cannot hold D and I
+	MRS rPbyteHi, APSR
 .endm
 
 @ report bad instruction (dead end)
@@ -259,8 +262,13 @@ printstate:
         ldrb	r0, [rmem, rPC]
 
 /* it would be neat to enable tracing if the user pushbutton is pressed */
+/* also to have other triggering conditions, such as instruction count, PC value, memory access */
+/* we'll put up with an emulator (wdm) operation */
 #ifdef TRACE6502
+	cmp	rTrace, #0
+	beq	nottracing
 	print6502state
+nottracing:
 #endif
 
 	add	rPC, #1    @ no auto increment in thumb
@@ -285,8 +293,9 @@ emulator:
 	@ we're not returning to main() so we don't save any registers
 	mov	rPC, r0
 	mov	rmem, r1
+	mov	rTrace, #0
 	mov	rMask24, #0xffffff
-	mov	rPbyte, #0x30	@ set fixed bits 4 and 5 of 6502 status reg
+	mov	rPbyteLo, #(pByteXflag|pByteBflag)	@ set fixed bits 4 and 5 of 6502 status reg
 
 	@ we must at least mask the (uninitialised) register values
 	@ (PC was initialised by the caller)
@@ -347,6 +356,7 @@ dt: @ dispatch table
         .hword ((l_f0-dt)/2), ((l_f1-dt)/2), ((l_f2-dt)/2), ((l_f3-dt)/2), ((l_f4-dt)/2), ((l_f5-dt)/2), ((l_f6-dt)/2), ((l_f7-dt)/2)
         .hword ((l_f8-dt)/2), ((l_f9-dt)/2), ((l_fa-dt)/2), ((l_fb-dt)/2), ((l_fc-dt)/2), ((l_fd-dt)/2), ((l_fe-dt)/2), ((l_ff-dt)/2)
 
+
 @ overall for each instruction dispatched we will need to:
 @    compute effective address (if any) and adjust PC
 @      note that the effective address for an immediate is PC
@@ -368,6 +378,12 @@ dt: @ dispatch table
 .macro do_wdm addressmode
 	load_operand_byte r0	@ WDM operand is operation code
 	mov	r1, rAcc	@ Accumulator is parameter byte
+
+	@ deal with tracing control
+	cmp	r0, #0x54
+	bne	wdm_c
+	mov	rTrace, #1
+wdm_c:
         push    {r1-r3}  @ could be clobbered
 	blx	wdm_handler
         pop     {r1-r3}
@@ -408,7 +424,7 @@ dt: @ dispatch table
 .endm
 
 .macro do_txs addressmode
-	do_t rXreg rSP
+	mov	rSP, rXreg  @ perform directly because txs doesn't affect the flags
 .endm
 
 /* store */
@@ -459,31 +475,31 @@ dt: @ dispatch table
 
 /* processor flags */
 .macro do_sec addressmode
-	orr	rPbyte, #armCflag
+	orr	rPbyteHi, #armCflag
 .endm
 
 .macro do_sed addressmode
-	orr	rPbyte, #pByteDflag
+	orr	rPbyteLo, #pByteDflag
 .endm
 
 .macro do_sei addressmode
-	orr	rPbyte, #pByteIflag
+	orr	rPbyteLo, #pByteIflag
 .endm
 
 .macro do_clc addressmode
-	bic	rPbyte, #armCflag
+	bic	rPbyteHi, #armCflag
 .endm
 
 .macro do_cld addressmode
-	bic	rPbyte, #pByteDflag
+	bic	rPbyteLo, #pByteDflag
 .endm
 
 .macro do_cli addressmode
-	bic	rPbyte, #pByteIflag
+	bic	rPbyteLo, #pByteIflag
 .endm
 
 .macro do_clv addressmode
-	bic	rPbyte, #armVflag
+	bic	rPbyteHi, #armVflag
 .endm
 
 /* branches */
@@ -562,6 +578,7 @@ dt: @ dispatch table
 
 	@ push pByte in 6502 format
 	do_php imp
+	orr	rPbyteLo, #pByteIflag  @ BRK sets interrupt disable just as IRQ would
 
 	mov	r0, #0x10000
 	sub	r0, #2		@ brk/irq vector is 0xfffe
@@ -699,13 +716,13 @@ dt: @ dispatch table
 	mov	r0, r0, asl #24   @ we left-justify to get N correct
 	mov	r1, \reg, asl #24
 	setflags_pre
-	cmp	r1, r0
+	cmp	r1, r0		@ this has set N and Z, not V (or C)
 	MRS	r0, APSR	@ these manipulations feel pedestrian - could probably do better
 	bic	r0, #armVflag
-	tst	rPbyte, #armVflag
+	tst	rPbyteHi, #armVflag
 	it ne
 	orrne	r0, #armVflag
-	mov	rPbyte, r0
+	mov	rPbyteHi, r0
 .endm
 
 .macro do_cmp addressmode
@@ -746,21 +763,21 @@ dt: @ dispatch table
 	@ N bit and V bit to be set from bits 7 and 6 of the operand
 	@ r0:      -------- xx xx NV------
 	@ r1:	   -Z------ xx xx --------
-	@ rPbyte:  NZCV---- xx xx --11DI--
+	@ rPbyte:  NZCV---- xx xx --11DI--  (Now split into rPbyteHi and rPbyteLo)
 
-	bic	rPbyte, #(armNflag | armZflag | armVflag)
+	bic	rPbyteHi, #(armNflag | armZflag | armVflag)
 
 	tst	rAcc, r0		@ determine Z flag from AND
 	it eq
-	orreq	rPbyte, #armZflag
+	orreq	rPbyteHi, #armZflag
 
 	tst	r0, #0x80
 	it ne
-	orrne	rPbyte, #armNflag
+	orrne	rPbyteHi, #armNflag
 
 	tst	r0, #0x40
 	it ne
-	orrne	rPbyte, #armVflag
+	orrne	rPbyteHi, #armVflag
 .endm
 
 

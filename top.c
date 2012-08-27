@@ -101,17 +101,17 @@ void print6502state(int a, int x, int y, int s, int pc, int p, int ir){
 
 }
 
-int wdm_handler (int op, int c){
+int wdm_handler (int op, int acc){
 	if (op == 0){	       /* output */
 		/*
 		int n=sprintf(usb_tx_buf, "\n\rOutput: %02x (%c)\n\r", c, c);
 		for(int i=0;i<n;i++)
 			writechar(usb_tx_buf[i]);
 		*/
-		if(c=='\r')
+		if(acc=='\r')
 			writechar('\n');
-		writechar(c);
-		return(c);  /* we are emulating a STA so we must preserve A */
+		writechar(acc);
+		return(acc);  /* we are emulating a STA so we must preserve A */
 	} else if (op == 1) {  /* blocking input */
 		while (usb_rx_buf[0] == 0)
 	                usbd_poll();
@@ -120,6 +120,16 @@ int wdm_handler (int op, int c){
 		if(v=='\n')
 			v='\r'; /* convert to old-school serial port expectations */
 		return(v);
+	} else if (op == 0x54) {
+		/* tracing control is done in emulator.S */
+		return(acc);  /* we are emulating a NOP so we must preserve A */
+	} else if (op == 0x74) {
+		/* tracing control is done in emulator.S */
+		return(acc);  /* we are emulating a NOP so we must preserve A */
+	} else if (op == 0xff) {
+		/* dump machine state */
+                /* if only we knew how: we'd need to pass everything down to this function */
+		return(acc);  /* we are emulating a NOP so we must preserve A */
 	}
 	return (0);
 }
