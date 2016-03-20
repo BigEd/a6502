@@ -7,7 +7,7 @@ and that core will only run in Thumb mode.)
 On that dev board, the CPU runs at 168MHz and the emulated speed of
 the 6502 is 18MHz.
 
-The project is inspired by [Chris Baird's stm6502](https://github.com/cjbaird/stm6502), and likewise offers
+The project is inspired by [Chris Baird's stm6502](https://github.com/BigEd/stm6502), and likewise offers
 a 6502 with 64k RAM and a serial connection.  In this case the serial
 connection is over USB, and I/O is performed by an extended opcode
 instead of being memory-mapped.
@@ -25,8 +25,9 @@ built firmware.  The Makefile here will build a *.bin which includes
 an initial memory image for the 6502 - usually that would include a
 bootstrap ROM, monitor or application. 
 
-For convenience, there's a built a6502.bin file included in a
-subdirectory.  (This file is derived in part from other open source
+For convenience, there's a built a6502.bin file included in a subdirectory.
+It includes only the minimal C'mon monitor by Bruce Clark.
+(This binary file is derived in part from other open source
 projects and does not form part of the source of this project.)
 
 An example memory image called `basfigmon.img` is provided for
