@@ -7,6 +7,7 @@
 ; copyright and related or neighboring rights to this work. 
 ;
 ; retrieved from http://www.lowkey.comuf.com/cmon.htm
+; archived documentation at http://biged.github.io/6502-website-archives/lowkey.comuf.com/cmon.htm
 ;
 ; ported to ca65 from dev65 assembler
 ; /opt/cc65/bin/ca65 --listing -DSINGLESTEP cmon.a65 
