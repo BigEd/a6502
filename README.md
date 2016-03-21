@@ -37,6 +37,7 @@ in stm6502 - sources are found in that project. It contains:
   - supermon64 at F800, entered at reset
   - figforth at 0200 (g 0200)
   - EhBASIC at c800 (g c800)
+The file `basfigmon.bin` is a loadable a6502 built with this image.
 
 A microUSB cable connected to the south edge of the dev board offers
 a serial connection to the emulated CPU, which communicates using
