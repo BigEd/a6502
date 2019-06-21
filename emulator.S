@@ -833,9 +833,9 @@ wdm_c:
 	tst	\reg, #0x1	@ detect the outgoing carry
 	it ne
 	orrne	\reg, #0x200	@ propagate the outgoing carry
+	bic     \reg, #0x1      @ clear bit 1
 	lsls	\reg, #23	@ left-justify to set N and Z
 	setflags_post
-
 	lsr	\reg, #24
 .endm
 
